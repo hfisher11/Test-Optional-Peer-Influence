@@ -1,0 +1,70 @@
+---
+title: "Liberal Arts Colleges Model"
+author: "Henry Fisher"
+date: "5/9/2023"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(lme4)
+library(tidyverse)
+```
+
+
+
+So I kinda messed up and did everything in the console as a joke but here's the actual stuff I did mostly
+```{r}
+IDkey <- read_csv("Top50ID - School IDs.csv")
+peeredgelist <- read_csv("PeerEdgeList50.csv")
+
+#I used some joins to get this csv, that I then put back into google sheets and then took back here because I didn't realize what else I needed to do
+top50peers <- read_csv("top50peers.csv")
+
+paneldata <- read_csv("paneldata.csv")
+paneldata_long <- paneldata %>%
+  pivot_longer(3:56, names_to = "Year", values_to = "Policy") %>%
+  rename(Peer = `IPEDS ID`)
+
+#even though that isn't the peer in this case, I use the long panel data to join back into the edge list to get time period data for all peers of all schools
+
+fjell <- left_join(paneldata_long, peeredgelist, by = "Peer") %>%
+  select(5,2,3,4)
+test <- left_join(peeredgelist, paneldata_long, by = "Peer")
+
+
+#calculate proportion of peers that are test optional in a year and ditto for number
+PeerPolicy0 <- fjell %>%
+  group_by(Institution, Year) %>%
+  summarize(num_optional = sum(Policy),
+            prop_optional = 100 * sum(Policy)/n())
+
+#finally add back the original institution's policy
+
+fjord <- paneldata_long %>%
+  select(2:4) %>%
+  rename(Institution = Peer)
+
+PeerPolicy <- left_join(fjord, PeerPolicy0, by = c("Institution", "Year")) %>%
+  filter(Year < 2020)
+```
+
+Here is where I run the model
+```{r}
+model1 <- glmer(Policy ~ prop_optional + (1|Institution), data = PeerPolicy, family = "binomial")
+
+summary(model1)
+# for proportion optional
+```
+```{r}
+model2 <- glmer(Policy ~ num_optional + (1|Institution), data = PeerPolicy, family = "binomial")
+
+summary(model2)
+#for number optional
+```
+
+
+
